@@ -1,0 +1,27 @@
+name: 美股晨間彙報
+
+on:
+  schedule:
+    - cron: '0 23 * * 0-4'  # UTC 23:00 = 台灣時間 07:00（週一至週五）
+  workflow_dispatch:          # 允許手動觸發
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance requests
+
+      - name: Run morning report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python us_morning_report.py
