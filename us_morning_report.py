@@ -5,7 +5,7 @@
 import json
 import requests
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 CONFIG_FILE = r"C:\Users\User\tradingview-mcp-jackson\nq_report_config.json"
 
@@ -62,7 +62,8 @@ def arrow(pct):
     return "🔴" if pct < 0 else "🟢"
 
 def build_message():
-    today = datetime.now().strftime("%Y/%m/%d %H:%M")
+    tz_tw = timezone(timedelta(hours=8))
+    today = datetime.now(tz_tw).strftime("%Y/%m/%d %H:%M")
     lines = [f"🇺🇸 <b>美股彙報 — {today}</b>\n"]
 
     # 三大指數
