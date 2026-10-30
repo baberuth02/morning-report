@@ -112,6 +112,7 @@ ul.evt .txt{min-width:0;overflow-wrap:anywhere}
       <div class="ctrls" style="margin-top:8px">
         <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">檢查 TradingView 連線中…</span></span>
         <label class="tog"><input type="checkbox" id="auto"> 每 60 秒自動更新報價</label>
+        <label class="tog"><input type="checkbox" id="auto-charts"> 每 5 分鐘自動更新 K 線</label>
         <button class="primary" id="btn-quotes">更新報價</button>
         <button id="btn-charts">更新 K 線</button>
       </div>
@@ -201,7 +202,7 @@ ul.evt .txt{min-width:0;overflow-wrap:anywhere}
       <li><span class="n">1</span><span>喺 Claude 桌面 App 開呢頁</span></li>
       <li><span class="n">2</span><span>開住 TradingView Desktop 同自選清單</span></li>
       <li><span class="n">3</span><span>版面設 3 圖：NQ1! 1H／日／週</span></li>
-      <li><span class="n">4</span><span>撳「更新報價」同「更新 K 線」</span></li>
+      <li><span class="n">4</span><span>撳「更新報價」同「更新 K 線」，或剔自動更新</span></li>
       <li><span class="n">5</span><span>每日更新本日餘額同保證金</span></li></ul></section>
   </div>
   <div class="banner" id="banner"></div>
@@ -216,7 +217,7 @@ const DEFAULT_STATE={
   portfolio:["YM","NQ","ES"].map(c=>({code:c})),
   stocks:["DJI","IXIC","SPX","SOX","VX","BZ","CL","GC","MSFT","NVDA","AAPL","TSLA","META","AMZN","GOOGL","GOOG","AVGO","TSM","SPCX","QQQ","VOO","SOXL","USDINDEX","BTC"].map(c=>({code:c})),
   positions:[], equity:{balance:null,initMargin:null,maintMargin:null,fx:null},
-  econ:[],earn:[],news:[], autoRefresh:false};
+  econ:[],earn:[],news:[], autoRefresh:false, autoCharts:false};
 let S=JSON.parse(JSON.stringify(DEFAULT_STATE));
 let SNAP={quotes:{},quotesAt:null,bars:{},barsAt:{}};
 let db=null,uid=null,mcp=null,hostOK=null;
@@ -262,7 +263,7 @@ function posRows(){
 }
 function renderPositions(){
   const rows=posRows();
-  $("positions").innerHTML=rows.map((p,i)=>`<tr><td class="sym">${esc(p.sym)}</td><td>${p.side==="S"?"賣出":"買進"}</td>
+  if(!editingIn("positions"))$("positions").innerHTML=rows.map((p,i)=>`<tr><td class="sym">${esc(p.sym)}</td><td>${p.side==="S"?"賣出":"買進"}</td>
     <td class="num">${p.qty}</td><td class="num">${fmt(p.price)}</td>
     <td class="num">${quoteFor({code:p.sym})?fmt(p.m):`<input type="number" step="any" data-mkt="${i}" value="${p.mkt??""}" placeholder="市價" aria-label="${esc(p.sym)} 市價">`}</td>
     <td class="num ${cls(p.pl)}">${p.pl==null?"—":sgn(p.pl,1)}</td>
@@ -289,7 +290,7 @@ function renderEquity(plUsd){
   const call=eq!=null&&E.maintMargin!=null&&E.initMargin!=null?(eq<E.maintMargin?E.initMargin-eq:0):null;
   const risk=eq!=null&&E.initMargin?eq/E.initMargin*100:null;
   const inp=(k,v)=>`<input type="number" step="any" data-eq="${k}" value="${v??""}" placeholder="輸入" aria-label="${k}">`;
-  $("equity").innerHTML=`
+  if(!editingIn("equity"))$("equity").innerHTML=`
     <div><span class="k">本日餘額</span>${inp("balance",E.balance)}</div>
     <div><span class="k">原始保證金</span>${inp("initMargin",E.initMargin)}</div>
     <div><span class="k">未沖銷浮動損益</span><span class="num ${cls(floatTwd)}">${sgn(floatTwd)}</span></div>
@@ -401,9 +402,11 @@ function explain(e){
   }
 }
 async function call(tool,input){const r=await mcp.callTool(HOST,tool,input??{},{cache:false});return r.payload}
-let busyQ=false;
+let busyQ=false,busyC=false;
+// 自動更新時唔好覆蓋緊你打緊字嘅欄位
+const editingIn=id=>{const a=document.activeElement;return !!(a&&a.tagName==="INPUT"&&$(id)?.contains(a))};
 async function refreshQuotes(){
-  if(!mcp||busyQ)return;busyQ=true;setConn("wait","讀取報價中…");
+  if(!mcp||busyQ||busyC)return;busyQ=true;setConn("wait","讀取報價中…");
   try{
     const p=await call("watchlist_get");
     const list=p?.symbols||[];
@@ -416,7 +419,7 @@ async function refreshQuotes(){
 }
 function slotOf(res){res=String(res||"").toUpperCase();if(res==="60"||res==="1H")return"h1";if(res==="D"||res==="1D")return"d1";if(res==="W"||res==="1W")return"w1";return null}
 async function refreshCharts(){
-  if(!mcp)return;setConn("wait","讀取 K 線中…");
+  if(!mcp||busyC||busyQ)return;busyC=true;setConn("wait","讀取 K 線中…");
   try{
     const pl=await call("pane_list");const panes=pl?.panes||[];const orig=pl?.active_index;
     const targets=panes.filter(p=>slotOf(p.resolution)&&/NQ/i.test(p.symbol||""));
@@ -428,12 +431,16 @@ async function refreshCharts(){
     hostOK=true;saveSnap();drawAll();
     setConn(got?"ok":"err",got?`已讀取 ${got} 個 NQ 圖表`:"搵唔到 NQ 嘅 1H／日線／週線圖表，請檢查 TradingView 版面");
   }catch(e){setConn("err",explain(e));drawAll()}
+  finally{busyC=false}
 }
 function store(slot,o){if(!slot||!o?.bars)return;SNAP.bars[slot]=o.bars.map(b=>[b.time,b.open,b.high,b.low,b.close]);SNAP.barsAt[slot]=Date.now()}
 $("btn-quotes").onclick=refreshQuotes;$("btn-charts").onclick=refreshCharts;
 let timer=null;
 function setAuto(on){S.autoRefresh=on;$("auto").checked=on;clearInterval(timer);if(on&&mcp)timer=setInterval(()=>{if(!document.hidden)refreshQuotes()},60000)}
 $("auto").onchange=()=>{setAuto($("auto").checked);save()};
+let timerC=null;
+function setAutoCharts(on){if(on===S.autoCharts&&timerC&&on)return;S.autoCharts=on;$("auto-charts").checked=on;clearInterval(timerC);timerC=null;if(on&&mcp)timerC=setInterval(()=>{if(!document.hidden)refreshCharts()},300000)}
+$("auto-charts").onchange=()=>{const on=$("auto-charts").checked;setAutoCharts(on);save();if(on)refreshCharts()};
 
 /* ---------- 儲存 ---------- */
 const LS="nq-board";
@@ -467,7 +474,7 @@ renderAll();drawAll();setConn("","檢查 TradingView 連線中…");
   const [d,u,m]=await Promise.all([c.use("db"),c.use("user"),c.use("mcp")]);
   db=d;mcp=m;uid=u?await u.id():null;
   if(db&&uid){
-    db.doc(`data/users/${uid}/board`).onSnapshot(s=>{if(s.exists){S={...DEFAULT_STATE,...s.data()};setAuto(!!S.autoRefresh);renderAll()}},()=>{});
+    db.doc(`data/users/${uid}/board`).onSnapshot(s=>{if(s.exists){S={...DEFAULT_STATE,...s.data()};setAuto(!!S.autoRefresh);setAutoCharts(!!S.autoCharts);renderAll()}},()=>{});
     db.doc(`data/users/${uid}/snap`).onSnapshot(s=>{if(!s.exists)return;const v=s.data();
       const parse=x=>{try{return JSON.parse(x||"[]")}catch(e){return[]}};
       SNAP={quotes:v.quotes||{},quotesAt:v.quotesAt||null,barsAt:v.barsAt||{},bars:{h1:parse(v.h1),d1:parse(v.d1),w1:parse(v.w1)}};renderAll();drawAll()},()=>{});
@@ -475,6 +482,6 @@ renderAll();drawAll();setConn("","檢查 TradingView 連線中…");
   if(!mcp){hostOK=false;setConn("err","呢個檢視唔支援 TradingView MCP，顯示上次儲存嘅資料");$("btn-quotes").disabled=$("btn-charts").disabled=true;drawAll();return}
   const lt=await mcp.listTools(HOST).catch(()=>null);
   if(lt&&!lt.servers?.length){hostOK=false;setConn("err","未連到 TradingView MCP：要喺 Claude 桌面 App 開，並開住 TradingView Desktop");drawAll();return}
-  hostOK=true;setConn("wait","可以連線・撳「更新報價」開始");drawAll();setAuto(!!S.autoRefresh);
+  hostOK=true;setConn("wait","可以連線・撳「更新報價」開始");drawAll();setAuto(!!S.autoRefresh);setAutoCharts(!!S.autoCharts);
 })().catch(()=>{});
 </script>
