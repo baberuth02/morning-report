@@ -1,0 +1,415 @@
+<title>NQ 期貨看盤台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 交易台三欄 — 左：報價清單｜中：NQ 1H 大圖 + 1D/1W 小圖｜右：部位、權益數、事件 */
+:root{
+  --bg:#EEF1F4; --panel:#FFFFFF; --ink:#16202A; --muted:#5F6B78; --line:#D6DCE3; --head:#F5F7F9;
+  --accent:#2A63B8; --up:#0E8A4F; --down:#C8372D; --warn:#B7791F; --grid:#E6EAEF;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D1117; --panel:#141A22; --ink:#E3E8EE; --muted:#8C98A6; --line:#26303B; --head:#19212B;
+  --accent:#6EA2EC; --up:#2FBF77; --down:#F0625A; --warn:#E0A84A; --grid:#1E2731; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1117; --panel:#141A22; --ink:#E3E8EE; --muted:#8C98A6; --line:#26303B; --head:#19212B;
+  --accent:#6EA2EC; --up:#2FBF77; --down:#F0625A; --warn:#E0A84A; --grid:#1E2731; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:13px;line-height:1.45}
+.wrap{max-width:1500px;margin:0 auto;padding-block:14px 32px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:12px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .muted{color:var(--muted)}
+button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:4px 10px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+button.x{border:none;background:none;color:var(--muted);padding:0 4px;font-size:14px;line-height:1}
+button.x:hover{color:var(--down)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 6px;min-width:0;width:100%}
+
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
+.topbar h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em}
+.topbar .ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.conn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--up)} .dot.err{background:var(--down)} .dot.wait{background:var(--warn)}
+label.tog{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+label.tog input{width:auto}
+
+.board{display:grid;grid-template-columns:minmax(250px,290px) minmax(0,1fr) minmax(330px,400px);gap:12px;align-items:start}
+.col{display:grid;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0;overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;background:var(--head);border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ph small{font-weight:400;color:var(--muted)}
+
+table{border-collapse:collapse;width:100%}
+th,td{padding:3px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:500;font-size:11.5px;color:var(--muted)}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:none}
+td.sym{font-family:var(--f-num);font-weight:500}
+td.act{width:18px;padding:0 2px}
+.addrow{display:flex;gap:6px;padding:6px 8px;border-top:1px solid var(--line)}
+.addrow input{flex:1}
+
+.chart-big canvas{height:420px}
+.chart-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart-pair canvas{height:260px}
+canvas{display:block;width:100%}
+.chart-wrap{position:relative}
+.chart-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--muted);font-size:12px}
+.tv-link{font-weight:400;font-size:11.5px;color:var(--accent);text-decoration:none}
+
+.eq{display:grid;grid-template-columns:1fr 1fr}
+.eq>div{display:flex;justify-content:space-between;gap:8px;padding:4px 10px;border-bottom:1px solid var(--line);min-width:0}
+.eq>div:nth-child(odd){border-right:1px solid var(--line)}
+.eq .k{color:var(--muted)}
+.eq input{width:110px;text-align:right;font-family:var(--f-num);padding:1px 4px}
+.risk{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.meter{flex:1;height:8px;border-radius:4px;background:var(--grid);overflow:hidden}
+.meter span{display:block;height:100%}
+.chip{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+
+.pos-form{display:grid;grid-template-columns:1fr 1fr .7fr 1.2fr .8fr auto;gap:6px;padding:6px 8px;border-top:1px solid var(--line)}
+.pos td input{width:90px;text-align:right;font-family:var(--f-num);padding:1px 4px}
+
+ul.evt{list-style:none;margin:0;padding:0}
+ul.evt li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);align-items:baseline}
+ul.evt li:last-child{border-bottom:none}
+ul.evt .when{font-family:var(--f-num);color:var(--muted);font-size:12px}
+ul.evt .txt{min-width:0;overflow-wrap:anywhere}
+.empty{padding:12px 10px;color:var(--muted);font-size:12px}
+.evt-form{display:grid;grid-template-columns:110px 1fr auto;gap:6px;padding:6px 8px;border-top:1px solid var(--line)}
+
+.foot{font-size:11.5px;color:var(--muted)}
+.stale{font-size:11px;color:var(--muted);font-weight:400}
+
+@media (max-width:1180px){.board{grid-template-columns:minmax(240px,280px) minmax(0,1fr)}.board .right{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}}
+@media (max-width:760px){.board{grid-template-columns:1fr}.chart-pair{grid-template-columns:1fr}.chart-big canvas{height:300px}.board .right{grid-template-columns:1fr}
+  .pos-form{grid-template-columns:1fr 1fr 1fr}.evt-form{grid-template-columns:1fr auto}.evt-form input[type=text]:first-child{grid-column:1/-1}}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <h1>NQ 期貨看盤台</h1>
+    <div class="ctrls">
+      <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">檢查 TradingView 連線中…</span></span>
+      <label class="tog"><input type="checkbox" id="auto"> 每 60 秒自動更新報價</label>
+      <button class="primary" id="btn-quotes">更新報價</button>
+      <button id="btn-charts">更新 K 線</button>
+    </div>
+  </div>
+
+  <div class="board">
+    <!-- 左欄 -->
+    <div class="col">
+      <section class="panel" aria-labelledby="h-pf">
+        <div class="ph"><span id="h-pf">投資組合</span><small id="q-at"></small></div>
+        <table><thead><tr><th>代號</th><th>價格</th><th>漲跌額</th><th>漲跌幅</th><th></th></tr></thead><tbody id="list-portfolio"></tbody></table>
+        <form class="addrow" data-list="portfolio"><input id="add-portfolio" placeholder="加入代號，例如 RTY 或 RTY=RTY1!" aria-label="加入投資組合代號"><button>加入</button></form>
+      </section>
+      <section class="panel" aria-labelledby="h-st">
+        <div class="ph"><span id="h-st">重點個股</span><small>可自行增減</small></div>
+        <table><thead><tr><th>代號</th><th>價格</th><th>漲跌額</th><th>漲跌幅</th><th></th></tr></thead><tbody id="list-stocks"></tbody></table>
+        <form class="addrow" data-list="stocks"><input id="add-stocks" placeholder="加入代號，例如 AMD" aria-label="加入重點個股代號"><button>加入</button></form>
+      </section>
+    </div>
+
+    <!-- 中欄 -->
+    <div class="col">
+      <section class="panel chart-big">
+        <div class="ph"><span>NASDAQ 100 E-迷你期貨 1H</span><span class="stale" id="at-h1"></span></div>
+        <div class="chart-wrap"><canvas id="c-h1"></canvas><div class="chart-empty" id="e-h1"></div></div>
+      </section>
+      <div class="chart-pair">
+        <section class="panel">
+          <div class="ph"><span>NQ 1D</span><span class="stale" id="at-d1"></span></div>
+          <div class="chart-wrap"><canvas id="c-d1"></canvas><div class="chart-empty" id="e-d1"></div></div>
+        </section>
+        <section class="panel">
+          <div class="ph"><span>NQ 1W</span><span class="stale" id="at-w1"></span></div>
+          <div class="chart-wrap"><canvas id="c-w1"></canvas><div class="chart-empty" id="e-w1"></div></div>
+        </section>
+      </div>
+      <p class="foot">K 線從 TradingView 讀取：將 TradingView 版面設成 3 個圖表，分別放 NQ1! 嘅 1 小時、日線、週線，再撳「更新 K 線」。只得一個圖表嘅話，就會按嗰個圖表嘅週期放入對應位置。<a class="tv-link" href="https://www.tradingview.com/chart/?symbol=CME_MINI%3ANQ1%21" target="_blank" rel="noopener">喺 TradingView 網頁開 NQ1!</a></p>
+    </div>
+
+    <!-- 右欄 -->
+    <div class="col right">
+      <section class="panel pos" aria-labelledby="h-pos">
+        <div class="ph"><span id="h-pos">未平倉部位</span><small id="pos-total"></small></div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>商品</th><th>買/賣</th><th>口數</th><th>成交價</th><th>市價</th><th>未平倉損益</th><th></th></tr></thead>
+          <tbody id="positions"></tbody></table></div>
+        <form class="pos-form" id="pos-form">
+          <input id="p-sym" placeholder="商品" value="NQ" aria-label="商品">
+          <select id="p-side" aria-label="買賣"><option value="B">買進</option><option value="S">賣出</option></select>
+          <input id="p-qty" type="number" min="1" step="1" value="1" aria-label="口數">
+          <input id="p-price" type="number" step="any" placeholder="成交價" required aria-label="成交價">
+          <input id="p-mult" type="number" step="any" value="2" title="每點價值（USD）：MNQ 2、NQ 20" aria-label="每點價值">
+          <button class="primary">加入</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="h-eq">
+        <div class="ph"><span id="h-eq">權益數</span><small>TWD・藍色欄位可修改</small></div>
+        <div class="eq" id="equity"></div>
+        <div class="risk"><span class="muted">風險指標</span><div class="meter"><span id="risk-bar"></span></div><span class="num" id="risk-val">—</span><span class="chip" id="risk-chip"></span></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-econ">
+        <div class="ph"><span id="h-econ">本週重大經濟數據</span></div>
+        <ul class="evt" id="evt-econ"></ul>
+        <form class="evt-form" data-evt="econ"><input type="text" placeholder="日期時間，例如 10/31 20:30" aria-label="日期時間"><input type="text" placeholder="項目，例如 美國 PCE 物價指數" aria-label="內容" required><button>加入</button></form>
+      </section>
+      <section class="panel" aria-labelledby="h-earn">
+        <div class="ph"><span id="h-earn">本週重點個股財報</span></div>
+        <ul class="evt" id="evt-earn"></ul>
+        <form class="evt-form" data-evt="earn"><input type="text" placeholder="日期，例如 10/30 盤後" aria-label="日期"><input type="text" placeholder="公司，例如 AAPL、AMZN" aria-label="內容" required><button>加入</button></form>
+      </section>
+      <section class="panel" aria-labelledby="h-news">
+        <div class="ph"><span id="h-news">即時重要訊息</span></div>
+        <ul class="evt" id="evt-news"></ul>
+        <form class="evt-form" data-evt="news"><input type="text" placeholder="時間" aria-label="時間"><input type="text" placeholder="訊息內容" aria-label="內容" required><button>加入</button></form>
+      </section>
+    </div>
+  </div>
+  <p class="foot">報價來自你 TradingView 嘅自選清單（watchlist），要喺 Claude 桌面 App 開呢頁，而且 TradingView Desktop 同 TradingView MCP 要開住。權益數按公式估算：權益數 = 本日餘額 + 浮動損益 × 匯率；風險指標 = 權益數 ÷ 原始保證金；實際以期貨商為準。本頁唔構成投資建議。</p>
+</div>
+
+<script>
+const HOST="host:tradingview";
+// 代號 → TradingView 代號（可用「代號=TV代號」自訂）
+const TV_MAP={YM:"YM1!",NQ:"NQ1!",ES:"ES1!",RTY:"RTY1!",DJI:"DJI",IXIC:"IXIC",SPX:"SPX",SOX:"SOX",VX:"VX1!",BZ:"BZ1!",CL:"CL1!",GC:"GC1!",USDINDEX:"DXY",BTC:"BTCUSD"};
+const DEFAULT_STATE={
+  portfolio:["YM","NQ","ES"].map(c=>({code:c})),
+  stocks:["DJI","IXIC","SPX","SOX","VX","BZ","CL","GC","MSFT","NVDA","AAPL","TSLA","META","AMZN","GOOGL","GOOG","AVGO","TSM","SPCX","QQQ","VOO","SOXL","USDINDEX","BTC"].map(c=>({code:c})),
+  positions:[], equity:{balance:null,initMargin:null,maintMargin:null,fx:null},
+  econ:[],earn:[],news:[], autoRefresh:false};
+let S=JSON.parse(JSON.stringify(DEFAULT_STATE));
+let SNAP={quotes:{},quotesAt:null,bars:{},barsAt:{}};
+let db=null,uid=null,mcp=null,hostOK=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=(n,d=2)=>n==null||!isFinite(n)?"—":Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=(n,d=2)=>n==null||!isFinite(n)?"—":(n>0?"+":"")+fmt(n,d);
+const cls=n=>n>0?"up":n<0?"down":"";
+const pnum=s=>{if(s==null)return null;if(typeof s==="number")return s;const v=parseFloat(String(s).replace(/[−–]/g,"-").replace(/[,+%\s]/g,""));return isFinite(v)?v:null};
+const tvOf=it=>(it.tv||TV_MAP[it.code.toUpperCase()]||it.code).toUpperCase();
+const hhmm=t=>{const d=new Date(t);return d.toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})};
+
+/* ---------- 報價清單 ---------- */
+function quoteFor(it){
+  const want=tvOf(it);
+  for(const k in SNAP.quotes){const base=k.split(":").pop().toUpperCase();if(base===want||k.toUpperCase()===want)return SNAP.quotes[k]}
+  return null;
+}
+function renderList(name){
+  $("list-"+name).innerHTML=S[name].map((it,i)=>{const q=quoteFor(it);
+    return `<tr><td class="sym" title="TradingView：${esc(tvOf(it))}">${esc(it.code)}</td>
+      <td class="num">${q?fmt(q.last,q.last>=1000?2:2):"—"}</td><td class="num ${q?cls(q.chg):""}">${q?sgn(q.chg):"—"}</td>
+      <td class="num ${q?cls(q.pct):""}">${q&&q.pct!=null?sgn(q.pct)+"%":"—"}</td>
+      <td class="act"><button class="x" data-rm="${name}:${i}" aria-label="移除 ${esc(it.code)}">×</button></td></tr>`}).join("")
+    ||`<tr><td colspan="5" class="empty">未有代號，喺下面加入。</td></tr>`;
+}
+document.querySelectorAll("form.addrow").forEach(f=>f.onsubmit=e=>{e.preventDefault();
+  const name=f.dataset.list,inp=f.querySelector("input"),raw=inp.value.trim();if(!raw)return;
+  const [code,tv]=raw.split("=").map(s=>s.trim());
+  S[name].push(tv?{code:code.toUpperCase(),tv:tv.toUpperCase()}:{code:code.toUpperCase()});inp.value="";save();renderAll();});
+document.addEventListener("click",e=>{
+  const rm=e.target.closest("[data-rm]");if(rm){const [n,i]=rm.dataset.rm.split(":");S[n].splice(+i,1);save();renderAll();}
+});
+
+/* ---------- 部位與權益 ---------- */
+function mktPrice(p){
+  const q=quoteFor({code:p.sym});
+  return q?.last ?? p.mkt ?? null;
+}
+function posRows(){
+  return S.positions.map(p=>{const m=mktPrice(p),dir=p.side==="S"?-1:1;
+    const pl=m==null?null:(m-p.price)*dir*p.qty*(p.mult||1);return{...p,m,pl}});
+}
+function renderPositions(){
+  const rows=posRows();
+  $("positions").innerHTML=rows.map((p,i)=>`<tr><td class="sym">${esc(p.sym)}</td><td>${p.side==="S"?"賣出":"買進"}</td>
+    <td class="num">${p.qty}</td><td class="num">${fmt(p.price)}</td>
+    <td class="num">${quoteFor({code:p.sym})?fmt(p.m):`<input type="number" step="any" data-mkt="${i}" value="${p.mkt??""}" placeholder="市價" aria-label="${esc(p.sym)} 市價">`}</td>
+    <td class="num ${cls(p.pl)}">${p.pl==null?"—":sgn(p.pl,1)}</td>
+    <td class="act"><button class="x" data-rmpos="${i}" aria-label="刪除部位">×</button></td></tr>`).join("")
+    ||`<tr><td colspan="7" class="empty">未有未平倉部位，用下面表格加入。</td></tr>`;
+  const tot=rows.reduce((a,p)=>a+(p.pl||0),0);
+  $("pos-total").innerHTML=rows.length?`合計 <span class="num ${cls(tot)}">${sgn(tot,1)}</span> USD`:"";
+  document.querySelectorAll("[data-mkt]").forEach(inp=>inp.onchange=()=>{S.positions[+inp.dataset.mkt].mkt=pnum(inp.value);save();renderAll()});
+  document.querySelectorAll("[data-rmpos]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.ok){S.positions.splice(+b.dataset.rmpos,1);save();renderAll()}
+    else{b.dataset.ok="1";b.textContent="確定?";b.style.fontSize="11px";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent="×";b.style.fontSize=""}},3000)}});
+  return tot;
+}
+$("pos-form").onsubmit=e=>{e.preventDefault();
+  const price=pnum($("p-price").value);if(price==null)return;
+  S.positions.push({sym:$("p-sym").value.trim().toUpperCase()||"NQ",side:$("p-side").value,qty:parseInt($("p-qty").value)||1,price,mult:pnum($("p-mult").value)||1});
+  $("p-price").value="";save();renderAll();};
+
+function renderEquity(plUsd){
+  const E=S.equity,fx=E.fx;
+  const floatTwd=fx?plUsd*fx:null;
+  const eq=E.balance!=null&&floatTwd!=null?E.balance+floatTwd:null;
+  const avail=eq!=null&&E.initMargin!=null?eq-E.initMargin:null;
+  const call=eq!=null&&E.maintMargin!=null&&E.initMargin!=null?(eq<E.maintMargin?E.initMargin-eq:0):null;
+  const risk=eq!=null&&E.initMargin?eq/E.initMargin*100:null;
+  const inp=(k,v)=>`<input type="number" step="any" data-eq="${k}" value="${v??""}" placeholder="輸入" aria-label="${k}">`;
+  $("equity").innerHTML=`
+    <div><span class="k">本日餘額</span>${inp("balance",E.balance)}</div>
+    <div><span class="k">原始保證金</span>${inp("initMargin",E.initMargin)}</div>
+    <div><span class="k">未沖銷浮動損益</span><span class="num ${cls(floatTwd)}">${sgn(floatTwd)}</span></div>
+    <div><span class="k">維持保證金</span>${inp("maintMargin",E.maintMargin)}</div>
+    <div><span class="k">權益數</span><span class="num">${fmt(eq)}</span></div>
+    <div><span class="k">可動用保證金</span><span class="num ${cls(avail)}">${fmt(avail)}</span></div>
+    <div><span class="k">權益總值</span><span class="num">${fmt(eq)}</span></div>
+    <div><span class="k">追繳保證金</span><span class="num ${call>0?"down":""}">${fmt(call)}</span></div>
+    <div><span class="k">匯率 USD/TWD</span>${inp("fx",E.fx)}</div>
+    <div><span class="k">浮動損益（USD）</span><span class="num ${cls(plUsd)}">${sgn(plUsd,1)}</span></div>`;
+  document.querySelectorAll("[data-eq]").forEach(i=>i.onchange=()=>{S.equity[i.dataset.eq]=pnum(i.value);save();renderAll()});
+  const lvl=risk==null?null:risk>=100?["安全","up"]:risk>=(E.maintMargin&&E.initMargin?E.maintMargin/E.initMargin*100:75)?["注意","warn"]:["低於維持","down"];
+  $("risk-val").textContent=risk==null?"—":fmt(risk)+"%";
+  const bar=$("risk-bar");bar.style.width=risk==null?"0":Math.min(100,Math.max(0,risk/1.5))+"%";
+  bar.style.background=lvl?`var(--${lvl[1]})`:"transparent";
+  const chip=$("risk-chip");chip.textContent=lvl?lvl[0]:"";chip.style.color=lvl?`var(--${lvl[1]})`:"";chip.hidden=!lvl;
+}
+
+/* ---------- 事件清單 ---------- */
+function renderEvents(k){
+  $("evt-"+k).innerHTML=S[k].map((x,i)=>`<li><span class="when">${esc(x.when)}</span><span class="txt">${esc(x.text)}</span><button class="x" data-rmevt="${k}:${i}" aria-label="刪除">×</button></li>`).join("")
+    ||`<li class="empty" style="display:block">未有項目，喺下面加入。</li>`;
+}
+document.querySelectorAll("form.evt-form").forEach(f=>f.onsubmit=e=>{e.preventDefault();
+  const [w,t]=f.querySelectorAll("input");if(!t.value.trim())return;
+  S[f.dataset.evt].push({when:w.value.trim(),text:t.value.trim()});w.value="";t.value="";save();renderAll();});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rmevt]");if(b){const [k,i]=b.dataset.rmevt.split(":");S[k].splice(+i,1);save();renderAll()}});
+
+/* ---------- K 線 ---------- */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function drawChart(key){
+  const cv=$("c-"+key),bars=SNAP.bars[key]||[],empty=$("e-"+key);
+  const w=cv.clientWidth,h=cv.clientHeight,dpr=window.devicePixelRatio||1;
+  cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);g.clearRect(0,0,w,h);
+  $("at-"+key).textContent=SNAP.barsAt[key]?"更新於 "+hhmm(SNAP.barsAt[key]):"";
+  if(!bars.length){empty.hidden=false;empty.textContent=hostOK?"撳「更新 K 線」由 TradingView 讀取":"未有 K 線資料。喺 Claude 桌面 App 開呢頁並開住 TradingView，就可以讀取。";return}
+  empty.hidden=true;
+  const axisW=64,padT=10,padB=22,cw=w-axisW,ch=h-padT-padB;
+  const n=Math.min(bars.length,Math.max(20,Math.floor(cw/7))),vis=bars.slice(-n);
+  let hi=Math.max(...vis.map(b=>b[2])),lo=Math.min(...vis.map(b=>b[3]));const pad=(hi-lo)*.06||1;hi+=pad;lo-=pad;
+  const y=v=>padT+(hi-v)/(hi-lo)*ch,step=cw/n,bw=Math.max(1,step*.65);
+  g.font=`11px ${css("--f-num")}`;g.textBaseline="middle";
+  const ticks=5;for(let i=0;i<=ticks;i++){const v=lo+(hi-lo)*i/ticks,yy=Math.round(y(v))+.5;
+    g.strokeStyle=css("--grid");g.lineWidth=1;g.beginPath();g.moveTo(0,yy);g.lineTo(cw,yy);g.stroke();
+    g.fillStyle=css("--muted");g.textAlign="left";g.fillText(fmt(v,v>=1000?0:2),cw+6,yy)}
+  const up=css("--up"),dn=css("--down");
+  vis.forEach((b,i)=>{const [t,o,H,L,c]=b,x=i*step+step/2,col=c>=o?up:dn;
+    g.strokeStyle=col;g.fillStyle=col;g.beginPath();g.moveTo(Math.round(x)+.5,y(H));g.lineTo(Math.round(x)+.5,y(L));g.stroke();
+    const top=y(Math.max(o,c)),bh=Math.max(1,Math.abs(y(o)-y(c)));g.fillRect(x-bw/2,top,bw,bh)});
+  const last=vis[vis.length-1],ly=y(last[4]),lc=last[4]>=last[1]?up:dn;
+  g.setLineDash([3,3]);g.strokeStyle=lc;g.beginPath();g.moveTo(0,ly);g.lineTo(cw,ly);g.stroke();g.setLineDash([]);
+  g.fillStyle=lc;g.fillRect(cw+1,ly-9,axisW-1,18);g.fillStyle=css("--panel");g.fillText(fmt(last[4]),cw+6,ly);
+  g.fillStyle=css("--muted");g.textBaseline="alphabetic";
+  const lab=t=>{const d=new Date(t*1000);return key==="h1"?`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}h`:key==="d1"?`${d.getMonth()+1}/${d.getDate()}`:`${d.getFullYear()%100}/${d.getMonth()+1}`};
+  const every=Math.ceil(n/Math.max(2,Math.floor(cw/90)));
+  for(let i=0;i<n;i+=every){g.textAlign=i===0?"left":"center";g.fillText(lab(vis[i][0]),i*step+step/2,h-6)}
+}
+const drawAll=()=>["h1","d1","w1"].forEach(drawChart);
+new ResizeObserver(()=>drawAll()).observe(document.querySelector(".board"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",drawAll);
+new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+/* ---------- TradingView MCP ---------- */
+function setConn(state,text){$("conn-dot").className="dot "+state;$("conn-text").textContent=text}
+function explain(e){
+  switch(e?.code){
+    case "server_not_connected":return"未連到 TradingView MCP：要喺 Claude 桌面 App 開呢頁，並開住 TradingView Desktop";
+    case "not_in_manifest":case "approval_required":return"未允許呢頁使用 TradingView MCP，撳更新時揀「允許」";
+    case "cancelled":return"你取消咗今次讀取";
+    case "tool_error":{const m=e.result?.content?.[0]?.text||e.message||"";return"TradingView 回報錯誤："+String(m).slice(0,120)}
+    case "server_unavailable":return"TradingView MCP 暫時冇回應，稍後再試";
+    default:return"讀取失敗（"+(e?.code||"未知")+"）";
+  }
+}
+async function call(tool,input){const r=await mcp.callTool(HOST,tool,input??{},{cache:false});return r.payload}
+let busyQ=false;
+async function refreshQuotes(){
+  if(!mcp||busyQ)return;busyQ=true;setConn("wait","讀取報價中…");
+  try{
+    const p=await call("watchlist_get");
+    const list=p?.symbols||[];
+    if(!list.length){setConn("err",p?.source==="panel_closed"?"TradingView 右邊嘅自選清單冇打開":"自選清單係空嘅，請將代號加入 TradingView watchlist");return}
+    const q={};list.forEach(s=>{q[s.symbol]={last:pnum(s.last),chg:pnum(s.change),pct:pnum(s.change_percent)}});
+    SNAP.quotes=q;SNAP.quotesAt=Date.now();hostOK=true;saveSnap();renderAll();
+    setConn("ok","已連線・報價 "+hhmm(SNAP.quotesAt));
+  }catch(e){setConn("err",explain(e));if(e?.code==="server_not_connected")hostOK=false}
+  finally{busyQ=false}
+}
+function slotOf(res){res=String(res||"").toUpperCase();if(res==="60"||res==="1H")return"h1";if(res==="D"||res==="1D")return"d1";if(res==="W"||res==="1W")return"w1";return null}
+async function refreshCharts(){
+  if(!mcp)return;setConn("wait","讀取 K 線中…");
+  try{
+    const pl=await call("pane_list");const panes=pl?.panes||[];const orig=pl?.active_index;
+    const targets=panes.filter(p=>slotOf(p.resolution)&&/NQ/i.test(p.symbol||""));
+    let got=0;
+    if(panes.length>1){
+      for(const p of targets){await call("pane_focus",{index:p.index});const o=await call("data_get_ohlcv",{count:200});store(slotOf(p.resolution),o);got++}
+      if(orig!=null&&targets.length)await call("pane_focus",{index:orig});
+    }else if(targets.length===1){const o=await call("data_get_ohlcv",{count:200});store(slotOf(targets[0].resolution),o);got++}
+    hostOK=true;saveSnap();drawAll();
+    setConn(got?"ok":"err",got?`已讀取 ${got} 個 NQ 圖表`:"搵唔到 NQ 嘅 1H／日線／週線圖表，請檢查 TradingView 版面");
+  }catch(e){setConn("err",explain(e));drawAll()}
+}
+function store(slot,o){if(!slot||!o?.bars)return;SNAP.bars[slot]=o.bars.map(b=>[b.time,b.open,b.high,b.low,b.close]);SNAP.barsAt[slot]=Date.now()}
+$("btn-quotes").onclick=refreshQuotes;$("btn-charts").onclick=refreshCharts;
+let timer=null;
+function setAuto(on){S.autoRefresh=on;$("auto").checked=on;clearInterval(timer);if(on&&mcp)timer=setInterval(()=>{if(!document.hidden)refreshQuotes()},60000)}
+$("auto").onchange=()=>{setAuto($("auto").checked);save()};
+
+/* ---------- 儲存 ---------- */
+const LS="nq-board";
+function lsLoad(){try{return JSON.parse(localStorage.getItem(LS))}catch(e){return null}}
+let saveT=null;
+function save(){
+  try{localStorage.setItem(LS,JSON.stringify({S,SNAP}))}catch(e){}
+  if(!db||!uid)return;clearTimeout(saveT);
+  saveT=setTimeout(()=>db.doc(`data/users/${uid}/board`).set(JSON.parse(JSON.stringify(S))).catch(()=>{}),600);
+}
+let snapT=null;
+function saveSnap(){
+  try{localStorage.setItem(LS,JSON.stringify({S,SNAP}))}catch(e){}
+  if(!db||!uid)return;clearTimeout(snapT);
+  snapT=setTimeout(()=>db.doc(`data/users/${uid}/snap`).set({quotes:SNAP.quotes,quotesAt:SNAP.quotesAt,barsAt:SNAP.barsAt,
+    h1:JSON.stringify(SNAP.bars.h1||[]),d1:JSON.stringify(SNAP.bars.d1||[]),w1:JSON.stringify(SNAP.bars.w1||[])}).catch(()=>{}),800);
+}
+
+function renderAll(){
+  renderList("portfolio");renderList("stocks");
+  $("q-at").textContent=SNAP.quotesAt?"報價 "+hhmm(SNAP.quotesAt):"";
+  const pl=renderPositions();renderEquity(pl);["econ","earn","news"].forEach(renderEvents);
+}
+
+/* ---------- 啟動 ---------- */
+const local=lsLoad();if(local){S={...S,...local.S};SNAP={...SNAP,...local.SNAP}}
+renderAll();drawAll();setConn("","檢查 TradingView 連線中…");
+
+(async()=>{
+  const c=window.claude;if(!c?.use){setConn("err","呢度冇 Claude 執行環境，資料只存喺呢部裝置");drawAll();return}
+  const [d,u,m]=await Promise.all([c.use("db"),c.use("user"),c.use("mcp")]);
+  db=d;mcp=m;uid=u?await u.id():null;
+  if(db&&uid){
+    db.doc(`data/users/${uid}/board`).onSnapshot(s=>{if(s.exists){S={...DEFAULT_STATE,...s.data()};setAuto(!!S.autoRefresh);renderAll()}},()=>{});
+    db.doc(`data/users/${uid}/snap`).onSnapshot(s=>{if(!s.exists)return;const v=s.data();
+      const parse=x=>{try{return JSON.parse(x||"[]")}catch(e){return[]}};
+      SNAP={quotes:v.quotes||{},quotesAt:v.quotesAt||null,barsAt:v.barsAt||{},bars:{h1:parse(v.h1),d1:parse(v.d1),w1:parse(v.w1)}};renderAll();drawAll()},()=>{});
+  }
+  if(!mcp){hostOK=false;setConn("err","呢個檢視唔支援 TradingView MCP，顯示上次儲存嘅資料");$("btn-quotes").disabled=$("btn-charts").disabled=true;drawAll();return}
+  const lt=await mcp.listTools(HOST).catch(()=>null);
+  if(lt&&!lt.servers?.length){hostOK=false;setConn("err","未連到 TradingView MCP：要喺 Claude 桌面 App 開，並開住 TradingView Desktop");drawAll();return}
+  hostOK=true;setConn("wait","可以連線・撳「更新報價」開始");drawAll();setAuto(!!S.autoRefresh);
+})().catch(()=>{});
+</script>
