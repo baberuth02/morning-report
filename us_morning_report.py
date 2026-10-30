@@ -6,6 +6,7 @@ import json
 import requests
 import yfinance as yf
 from datetime import datetime, timezone, timedelta
+from weekly_events import earnings_lines
 
 CONFIG_FILE = r"C:\Users\User\tradingview-mcp-jackson\nq_report_config.json"
 
@@ -85,6 +86,9 @@ def build_message():
             lines.append(f"{arrow(pct)} {name}({sym})：${price:,.2f}　{fmt_chg(chg, pct)}")
         else:
             lines.append(f"⬜ {name}({sym})：N/A")
+
+    lines.append("")
+    lines.extend(earnings_lines(TOP10))
 
     return "\n".join(lines)
 

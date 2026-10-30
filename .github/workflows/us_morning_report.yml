@@ -5,6 +5,9 @@ on:
     - cron: '0 23 * * 0-4'  # UTC 23:00 = 台灣時間 07:00（週一至週五）
   workflow_dispatch:          # 允許手動觸發
 
+permissions:
+  contents: write             # keepalive 需要 push 權限
+
 jobs:
   send-report:
     runs-on: ubuntu-latest
@@ -25,3 +28,18 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python us_morning_report.py
+
+      # GitHub 會在 repo 60 天沒有 commit 後自動停用排程 workflow，
+      # 距離上次 commit 超過 50 天就推一個空 commit 保持啟用
+      - name: Keepalive
+        if: always() && github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          days=$(( ($(date +%s) - last) / 86400 ))
+          echo "距離上次 commit：${days} 天"
+          if [ "$days" -ge 50 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive（防止排程 workflow 被停用）"
+            git push
+          fi
