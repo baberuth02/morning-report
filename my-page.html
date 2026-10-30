@@ -1,0 +1,285 @@
+<title>我的投資主頁</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;800&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 券商對帳單 — 頂部個人名片，下面係摘要數字、配置比例條、持倉明細表、關注清單 */
+:root{
+  --bg:#F2F4F6; --paper:#FFFFFF; --ink:#18212C; --muted:#5D6977; --line:#DCE1E7;
+  --accent:#1C5FA8; --accent-soft:#E3ECF7; --up:#11804A; --down:#C23A2E;
+  --f-display:"Noto Serif TC","Songti TC",serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10151B; --paper:#171E26; --ink:#E6EBF0; --muted:#94A0AD; --line:#2A333E;
+  --accent:#6FA6E6; --accent-soft:#1E2B3B; --up:#3DBA7A; --down:#EE6B5E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151B; --paper:#171E26; --ink:#E6EBF0; --muted:#94A0AD; --line:#2A333E;
+  --accent:#6FA6E6; --accent-soft:#1E2B3B; --up:#3DBA7A; --down:#EE6B5E; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:28px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0}
+h2{font-size:1.15rem;font-weight:600}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.label{font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:6px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+button.link{border:none;background:none;color:var(--accent);padding:2px 6px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+
+/* 名片 */
+.profile{display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:start;padding-bottom:24px;border-bottom:1px solid var(--line)}
+.avatar{width:64px;height:64px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-size:1.7rem;font-weight:800}
+.profile h1{font-size:1.9rem;font-weight:800}
+.tagline{color:var(--muted);margin:2px 0 8px}
+.bio{margin:0;max-width:62ch}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tag{font-size:.8rem;padding:2px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.profile-form{display:grid;gap:10px;grid-column:1/-1}
+.profile-form label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
+
+/* 摘要 */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);background:var(--paper);border:1px solid var(--line);border-radius:10px}
+.summary>div{padding:16px 18px;border-left:1px solid var(--line);min-width:0}
+.summary>div:first-child{border-left:none}
+.summary .big{font-size:1.35rem;font-weight:500;margin-top:2px;overflow-wrap:anywhere}
+.up{color:var(--up)} .down{color:var(--down)}
+
+/* 配置 */
+.alloc-bar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--line);margin-top:10px}
+.alloc-bar span{display:block;height:100%}
+.alloc-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.85rem}
+.alloc-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+
+/* 持倉表 */
+.table-box{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:10px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:500;font-size:.75rem;letter-spacing:.06em;color:var(--muted);background:var(--bg)}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:none}
+td .sym{font-family:var(--f-num);font-weight:500}
+td .nm{color:var(--muted);font-size:.85rem;margin-left:6px}
+.pill{font-family:var(--f-num);font-size:.78rem;padding:1px 8px;border-radius:999px}
+.pill.up{background:color-mix(in srgb,var(--up) 14%,transparent)}
+.pill.down{background:color-mix(in srgb,var(--down) 14%,transparent)}
+td input.price{width:96px;text-align:right;padding:3px 6px;font-family:var(--f-num)}
+.example-note{font-size:.82rem;color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+.add-form{display:grid;grid-template-columns:1.1fr 1.4fr .8fr 1fr 1fr .9fr auto;gap:8px;align-items:end;margin-top:12px}
+.add-form label{display:grid;gap:3px;font-size:.78rem;color:var(--muted);min-width:0}
+.fx{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+.fx input{width:90px;font-family:var(--f-num)}
+
+/* 關注清單 */
+.watch{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.watch a{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;color:var(--ink);text-decoration:none}
+.watch a:hover{border-color:var(--accent)}
+.watch .sym{font-family:var(--f-num);color:var(--muted);font-size:.85rem}
+.note{font-size:.82rem;color:var(--muted)}
+footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+.status{font-size:.8rem;color:var(--muted)}
+
+@media (max-width:760px){
+  .summary{grid-template-columns:repeat(2,1fr)}
+  .summary>div:nth-child(3){border-left:none}
+  .summary>div:nth-child(n+3){border-top:1px solid var(--line)}
+  .add-form{grid-template-columns:1fr 1fr}
+  .add-form .full{grid-column:1/-1}
+  .profile{grid-template-columns:auto 1fr}
+  .profile .edit-btn{grid-column:1/-1;justify-self:start}
+}
+@media (prefers-reduced-motion:no-preference){.alloc-bar span{transition:width .4s ease}}
+</style>
+
+<div class="wrap">
+  <header class="profile" id="profile"></header>
+
+  <section aria-labelledby="h-sum">
+    <div class="sec-head">
+      <h2 id="h-sum">資產總覽</h2>
+      <div class="fx"><label for="fx">美元匯率 USD/TWD</label><input id="fx" type="number" step="0.01" min="0" class="num"></div>
+    </div>
+    <div class="summary" style="margin-top:12px">
+      <div><div class="label">總市值（TWD）</div><div class="big num" id="s-mv">—</div></div>
+      <div><div class="label">總成本（TWD）</div><div class="big num" id="s-cost">—</div></div>
+      <div><div class="label">未實現損益</div><div class="big num" id="s-pl">—</div></div>
+      <div><div class="label">報酬率</div><div class="big num" id="s-ret">—</div></div>
+    </div>
+    <div class="alloc-bar" id="alloc-bar" aria-hidden="true"></div>
+    <div class="alloc-legend" id="alloc-legend"></div>
+  </section>
+
+  <section aria-labelledby="h-hold">
+    <div class="sec-head">
+      <h2 id="h-hold">持倉明細</h2>
+      <span class="status" id="status">載入中…</span>
+    </div>
+    <p class="example-note" id="example-note" hidden>以下係示例持倉，唔係你嘅資料。加入第一筆持倉後示例會自動消失。</p>
+    <div class="table-box" style="margin-top:10px">
+      <table>
+        <thead><tr><th>標的</th><th>幣別</th><th>股數</th><th>成本價</th><th>現價</th><th>市值（TWD）</th><th>損益（TWD）</th><th>報酬</th><th>佔比</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <form class="add-form" id="add-form" autocomplete="off">
+      <label>代號<input id="f-sym" required placeholder="2330 / NVDA"></label>
+      <label>名稱<input id="f-name" placeholder="台積電"></label>
+      <label>幣別<select id="f-cur"><option>TWD</option><option>USD</option></select></label>
+      <label>股數<input id="f-qty" type="number" step="any" min="0" required></label>
+      <label>成本價<input id="f-cost" type="number" step="any" min="0" required></label>
+      <label>現價<input id="f-price" type="number" step="any" min="0" placeholder="可稍後填"></label>
+      <button class="primary full" type="submit">加入持倉</button>
+    </form>
+    <p class="note">現價要自己更新：喺表入面直接改「現價」欄就會儲存。持倉只有你自己睇到。</p>
+  </section>
+
+  <section aria-labelledby="h-watch">
+    <div class="sec-head"><h2 id="h-watch">關注清單</h2><span class="note">撳一下開 Yahoo Finance 睇即時報價</span></div>
+    <div class="watch" id="watch" style="margin-top:12px"></div>
+  </section>
+
+  <footer>本頁只作個人記錄同分析用途，唔構成任何投資建議。損益按你輸入嘅現價同匯率計算，可能同實際市價有出入。</footer>
+</div>
+
+<script>
+const WATCH=[["^DJI","道瓊"],["^IXIC","那斯達克"],["^GSPC","S&P 500"],["^SOX","費城半導體"],["NVDA","輝達"],["AAPL","蘋果"],["MSFT","微軟"],["TSM","台積電 ADR"],["AMZN","亞馬遜"],["GOOGL","Alphabet"],["META","Meta"],["TSLA","特斯拉"],["AVGO","博通"],["2330.TW","台積電"]];
+const EXAMPLES=[
+  {id:"ex1",sym:"2330",name:"台積電",cur:"TWD",qty:1000,cost:820,price:1050},
+  {id:"ex2",sym:"0050",name:"元大台灣50",cur:"TWD",qty:2000,cost:150,price:188},
+  {id:"ex3",sym:"NVDA",name:"輝達",cur:"USD",qty:30,cost:120,price:182},
+  {id:"ex4",sym:"AAPL",name:"蘋果",cur:"USD",qty:20,cost:215,price:198}];
+const DEFAULT_PROFILE={name:"我的名字",tagline:"台灣・長線投資者",bio:"撳「編輯名片」寫低你嘅投資風格、目標同埋想記住嘅原則。",tags:["美股","台股","ETF"]};
+const PALETTE=["#1C5FA8","#2E9C8F","#D08A1E","#8A5BC2","#C2552E","#5E7D2A","#3E8FD1","#B0457A"];
+
+let db=null,user=null,isOwner=false,uid=null;
+let holdings=[],fx=32,profile={...DEFAULT_PROFILE},editing=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=(n,d=0)=>n==null||isNaN(n)?"—":n.toLocaleString("zh-TW",{minimumFractionDigits:d,maximumFractionDigits:d});
+const signed=(n,d=0)=>(n>0?"+":"")+fmt(n,d);
+const cls=n=>n>0?"up":n<0?"down":"";
+
+/* 本機備份：冇登入時用 */
+const LS="my-invest-page";
+function lsLoad(){try{return JSON.parse(localStorage.getItem(LS))||null}catch(e){return null}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify({holdings,fx,profile}))}catch(e){}}
+
+function renderProfile(){
+  const p=profile,el=$("profile");
+  if(editing){
+    el.innerHTML=`<form class="profile-form" id="pf">
+      <label>名字<input id="p-name" value="${esc(p.name)}" maxlength="40"></label>
+      <label>一句介紹<input id="p-tag" value="${esc(p.tagline)}" maxlength="80"></label>
+      <label>關於我<textarea id="p-bio" rows="3" maxlength="600">${esc(p.bio)}</textarea></label>
+      <label>興趣標籤（用逗號分隔）<input id="p-tags" value="${esc((p.tags||[]).join(", "))}"></label>
+      <div style="display:flex;gap:8px"><button class="primary" type="submit">儲存</button><button type="button" id="p-cancel">取消</button></div></form>`;
+    $("pf").onsubmit=e=>{e.preventDefault();
+      profile={name:$("p-name").value.trim()||"我的名字",tagline:$("p-tag").value.trim(),bio:$("p-bio").value.trim(),
+        tags:$("p-tags").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean).slice(0,12)};
+      editing=false;renderProfile();saveProfile();};
+    $("p-cancel").onclick=()=>{editing=false;renderProfile()};
+    return;
+  }
+  el.innerHTML=`<div class="avatar">${esc((p.name||"?").trim().charAt(0))}</div>
+    <div style="min-width:0"><h1>${esc(p.name)}</h1><p class="tagline">${esc(p.tagline)}</p><p class="bio">${esc(p.bio)}</p>
+    <div class="tags">${(p.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div>
+    ${canEditProfile()?`<button class="edit-btn" id="p-edit">編輯名片</button>`:""}`;
+  const b=$("p-edit"); if(b) b.onclick=()=>{editing=true;renderProfile()};
+}
+function canEditProfile(){return db?isOwner:true}
+
+function rowsData(){
+  const list=holdings.length?holdings:EXAMPLES;
+  const r=list.map(h=>{const rate=h.cur==="USD"?fx:1,price=h.price||h.cost;
+    const mv=h.qty*price*rate,cost=h.qty*h.cost*rate;return{...h,mv,costT:cost,pl:mv-cost,ret:cost?(mv-cost)/cost*100:0,noPrice:!h.price}});
+  const total=r.reduce((a,x)=>a+x.mv,0);r.forEach(x=>x.w=total?x.mv/total*100:0);
+  return{r,total,example:!holdings.length};
+}
+function render(){
+  const {r,total,example}=rowsData();
+  $("example-note").hidden=!example;
+  const cost=r.reduce((a,x)=>a+x.costT,0),pl=total-cost,ret=cost?pl/cost*100:0;
+  $("s-mv").textContent=fmt(total);$("s-cost").textContent=fmt(cost);
+  $("s-pl").textContent=signed(pl);$("s-pl").className="big num "+cls(pl);
+  $("s-ret").textContent=signed(ret,2)+"%";$("s-ret").className="big num "+cls(ret);
+  const sorted=[...r].sort((a,b)=>b.mv-a.mv);
+  $("alloc-bar").innerHTML=sorted.map((x,i)=>`<span style="width:${x.w}%;background:${PALETTE[i%PALETTE.length]}"></span>`).join("");
+  $("alloc-legend").innerHTML=sorted.map((x,i)=>`<span><i style="background:${PALETTE[i%PALETTE.length]}"></i>${esc(x.name||x.sym)} <span class="num">${fmt(x.w,1)}%</span></span>`).join("");
+  $("rows").innerHTML=sorted.length?sorted.map(x=>`<tr>
+    <td><span class="sym">${esc(x.sym)}</span><span class="nm">${esc(x.name)}</span></td>
+    <td>${esc(x.cur)}</td><td class="num">${fmt(x.qty,x.qty%1?2:0)}</td><td class="num">${fmt(x.cost,2)}</td>
+    <td>${example?`<span class="num">${fmt(x.price,2)}</span>`:`<input class="price" type="number" step="any" min="0" data-id="${esc(x.id)}" value="${x.price??""}" placeholder="未填" aria-label="${esc(x.sym)} 現價">`}</td>
+    <td class="num">${fmt(x.mv)}</td><td class="num ${cls(x.pl)}">${x.noPrice?"—":signed(x.pl)}</td>
+    <td>${x.noPrice?"":`<span class="pill ${cls(x.ret)}">${signed(x.ret,2)}%</span>`}</td>
+    <td class="num">${fmt(x.w,1)}%</td>
+    <td>${example?"":`<button class="link" data-del="${esc(x.id)}" aria-label="刪除 ${esc(x.sym)}">刪除</button>`}</td></tr>`).join("")
+    :`<tr><td colspan="10" class="empty">未有持倉</td></tr>`;
+  document.querySelectorAll("input.price").forEach(inp=>inp.onchange=()=>{const v=parseFloat(inp.value);updateHolding(inp.dataset.id,{price:isNaN(v)?null:v})});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.confirm){deleteHolding(b.dataset.del)}else{b.dataset.confirm="1";b.textContent="確定刪除？";setTimeout(()=>{if(b.isConnected){delete b.dataset.confirm;b.textContent="刪除"}},3000)}});
+}
+function renderWatch(){
+  $("watch").innerHTML=WATCH.map(([s,n])=>`<a href="https://finance.yahoo.com/quote/${encodeURIComponent(s)}" target="_blank" rel="noopener"><span>${esc(n)}</span><span class="sym">${esc(s)}</span></a>`).join("");
+}
+
+/* 儲存 */
+const col=()=>db.collection("data/users/"+uid);
+async function addHolding(h){
+  if(db&&uid){try{await col().doc("h_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)).set({kind:"holding",...h,created:Date.now()})}catch(e){$("status").textContent="儲存失敗："+(e.message||e.code)}}
+  else{holdings.push({id:"l"+Date.now(),...h});lsSave();render()}
+}
+async function updateHolding(id,patch){
+  if(db&&uid){try{await col().doc(id).update(patch)}catch(e){$("status").textContent="更新失敗："+(e.message||e.code)}}
+  else{const h=holdings.find(x=>x.id===id);if(h)Object.assign(h,patch);lsSave();render()}
+}
+async function deleteHolding(id){
+  if(db&&uid){try{await col().doc(id).delete()}catch(e){$("status").textContent="刪除失敗："+(e.message||e.code)}}
+  else{holdings=holdings.filter(x=>x.id!==id);lsSave();render()}
+}
+async function saveFx(){
+  if(db&&uid){try{await col().doc("settings").set({kind:"settings",fx})}catch(e){}}else lsSave();
+}
+async function saveProfile(){
+  if(db&&isOwner){try{await db.doc("profile/main").set(profile)}catch(e){$("status").textContent="名片儲存失敗："+(e.message||e.code)}}
+  else lsSave();
+}
+
+$("add-form").onsubmit=e=>{e.preventDefault();
+  const p=parseFloat($("f-price").value);
+  addHolding({sym:$("f-sym").value.trim().toUpperCase(),name:$("f-name").value.trim(),cur:$("f-cur").value,
+    qty:parseFloat($("f-qty").value),cost:parseFloat($("f-cost").value),price:isNaN(p)?null:p});
+  e.target.reset();$("f-sym").focus();};
+$("fx").onchange=()=>{const v=parseFloat($("fx").value);if(v>0){fx=v;render();saveFx()}};
+
+/* 啟動：先用本機資料畫一次，再連雲端 */
+const local=lsLoad();
+if(local){holdings=local.holdings||[];fx=local.fx||fx;profile=local.profile||profile}
+$("fx").value=fx;renderProfile();render();renderWatch();
+
+(async()=>{
+  const c=window.claude;
+  if(!c||!c.use){$("status").textContent="資料儲存喺呢部裝置嘅瀏覽器";return}
+  [db,user]=await Promise.all([c.use("db"),c.use("user")]);
+  isOwner=user?.isOwner()??false;
+  if(db)db.doc("profile/main").onSnapshot(s=>{if(s.exists&&!editing){profile={...DEFAULT_PROFILE,...s.data()};renderProfile()}},()=>{});
+  if(!db||!user){db=null;$("status").textContent="未登入：資料暫存喺呢部裝置";renderProfile();return}
+  uid=await user.id();
+  if(!uid){$("status").textContent="未登入：資料暫存喺呢部裝置";return}
+  renderProfile();
+  col().onSnapshot(snap=>{
+    holdings=[];snap.docs.forEach(d=>{const v=d.data()||{};
+      if(v.kind==="settings"){if(v.fx>0){fx=v.fx;$("fx").value=fx}}
+      else if(v.kind==="holding")holdings.push({id:d.id,...v})});
+    holdings.sort((a,b)=>(a.created||0)-(b.created||0));
+    $("status").textContent="已同步・只有你睇到";render();
+  },e=>{$("status").textContent="同步失敗："+(e.message||e.code)});
+})().catch(()=>{});
+</script>
